@@ -6,6 +6,7 @@
     <style>* {padding: 0; margin: 0}</style>
 </head>
 <body>
+    <script src="node_modules/underscore/underscore-min.js"></script>
     <script src="node_modules/pixi.js/dist/pixi.min.js"></script>
     <script type="text/javascript">
     var type = "WebGL";
@@ -39,40 +40,48 @@
     .add("textures/ufo.png")
     .load(setup);
 
+    function createBalls(balls, nb){
+        for(var i = 0; i < nb; ++i){
+            var ball = new Sprite(TextureCache["textures/ball.png"]);
+            ball.anchor.set(0.5);
+            ball.width = 68*Math.random()+1;
+            ball.height = ball.width;
+            ball.m = ball.width;
+            ball.x = Math.random()*(renderer.width-ball.width/2) + ball.width/2;
+            ball.y = Math.random()*(renderer.height-ball.width/2) + ball.width/2;
 
-    var ball;
+            //Change the sprite's size
+
+            ball.v = 10*Math.random();
+            ball.w = Math.random();
+            ball.a = 2*Math.PI*Math.random();
+            balls.push(ball);
+        }
+    }
+
+
+    var balls = [];
     var ufo;
     function setup() {
         //Create the `cat` sprite, add it to the stage, and render it
 
-        ball = new Sprite(TextureCache["textures/ball.png"]);
-        ball.anchor.set(0.5);
-        ball.x = renderer.width/2;
-        ball.y = renderer.height/2;
+        createBalls(balls, 20);
 
-        //Change the sprite's size
-        ball.width = 69;
-        ball.height = 69;
-        ball.v = 5;
-        ball.w = Math.random();
-        ball.a = 2*Math.PI*Math.random();
-
-        ufo = new Sprite(TextureCache["textures/ufo.png"]);
+        ufo = new Sprite(TextureCache["textures/ball.png"]);
         ufo.scale.set(0.3);
-        ufo.anchor.x = 0.5;
-        ufo.anchor.y = 0.25*ufo.width/ufo.height;
+        ufo.anchor.set(0.5);
         ufo.x = renderer.width/2;
-        ufo.y = renderer.height - ufo.height/3;
-        console.log(ufo);
+        ufo.y = renderer.height;
+        ufo.m = ufo.width;
+        ufo.v = 0;
+        ufo.w = 0;
+        ufo.a = 0;
 
-        //Change the sprite's size
-        //ball.width = 69;
-        //ball.height = 69;
-        ufo.v = 3;
-        ufo.vx = 0;
         ufoCommand(ufo);
+        _.each(balls, function(ball){
+            stage.addChild(ball);
+        })
 
-        stage.addChild(ball);
         stage.addChild(ufo);
         renderer.render(stage);
         //Start the game loop
@@ -107,25 +116,25 @@
             ball.w += sens * (Math.PI - da) * ball.v / (40*Math.PI);
         }
     }
-    function ufoCollison(ball, ufo){
-        var x = ball.x + ball.v * Math.cos(ball.a);
-        var y = ball.y + ball.v * Math.sin(ball.a);
-        var a = ball.a;
-        var d = Math.sqrt(Math.pow(y - ufo.y, 2) + Math.pow(x - ufo.x, 2));
+    function ballCollison(ball1, ball2){
+        var x1 = ball1.x + ball1.v * Math.cos(ball1.a);
+        var y1 = ball1.y + ball1.v * Math.sin(ball1.a);
+        var x2 = ball2.x + ball2.v * Math.cos(ball2.a);
+        var y2 = ball2.y + ball2.v * Math.sin(ball2.a);
+        var a1 = ball1.a;
+        var a2 = ball2.a;
+        var v1 = ball1.v;
+        var v2 = ball2.v;
+        var d1 = Math.sqrt(Math.pow(ball1.y - ball2.y, 2) + Math.pow(ball1.x - ball2.x, 2));
+        var d2 = Math.sqrt(Math.pow(y1 - y2, 2) + Math.pow(x1 - x2, 2));
 
-        if( d <= ball.width/2 + ufo.width/2){
-            var ca = Math.atan((y-ufo.y)/(x-ufo.x));
-            ball.a = 2*ca + Math.PI - ball.a;
-            console.log({ca: ca*360/(2*Math.PI), a: a*360/(2*Math.PI), b: ball.a*360/(2*Math.PI)});
+        if( d2 <= ball1.width/2 + ball2.width/2 && d2 < d1){
+            var ca = Math.atan((y1-y2)/(x1-x2));
+            ball1.a = (2*ca + 3*Math.PI - ball1.a)%(2*Math.PI);
+            ball2.a = (2*ca + 3*Math.PI - ball2.a)%(2*Math.PI);
         }
-        if(ball.a > 2*Math.PI){
-            ball.a -= 2*Math.PI;
-        }
-        if(ball.a < 0){
-            ball.a += 2*Math.PI;
-        }
-        if(ball.a != a){
-            var da = ball.a - a;
+        if(ball1.a != a1){
+            var da = ball1.a - a1;
             if(Math.abs(da) > Math.PI){
                 da = da < 0 ? da + Math.PI : da - Math.PI;
                 da = -da;
@@ -133,7 +142,20 @@
             var sens = da < 0 ? 1 : -1;
             da = Math.abs(da);
 
-            ball.w += sens * (ca - da) * ball.v / (40*Math.PI);
+            ball1.w += sens * (ca + 3*Math.PI/2 - da)%(2*Math.PI) * (v1 + v2) / (40*Math.PI);
+            ball1.v = (ca + 2*Math.PI/2 - da)%(2*Math.PI) * (v1 + v2)/(Math.PI);
+        }
+        if(ball2.a != a2){
+            var da = ball2.a - a1;
+            if(Math.abs(da) > Math.PI){
+                da = da < 0 ? da + Math.PI : da - Math.PI;
+                da = -da;
+            }
+            var sens = da < 0 ? 1 : -1;
+            da = Math.abs(da);
+
+            ball2.w += sens * (ca + 3*Math.PI/2 - da)%(2*Math.PI) * (v1 + v2) / (40*Math.PI);
+            ball2.v = (ca + 2*Math.PI/2 - da)%(2*Math.PI) * (v1 + v2)/(Math.PI);
         }
     }
     function keyboard(keyCode) {
@@ -181,18 +203,38 @@
 
         //Left arrow key `press` method
         left.press = function() {
-            ufo.vx = -ufo.v;
+            ufo.a = Math.PI;
+            ufo.v = 3;
         };
         left.release = function() {
-            ufo.vx = 0;
+            ufo.v = 0;
         };
 
-        //Left arrow key `press` method
+        //right arrow key `press` method
         right.press = function() {
-            ufo.vx = ufo.v;
+            ufo.a = 0;
+            ufo.v = 3;
         };
         right.release = function() {
-            ufo.vx = 0;
+            ufo.v = 0;
+        };
+
+        //up arrow key `press` method
+        up.press = function() {
+            ufo.a = 3*Math.PI/2;
+            ufo.v = 3;
+        };
+        up.release = function() {
+            ufo.v = 0;
+        };
+
+        //up arrow key `press` method
+        down.press = function() {
+            ufo.a = Math.PI/2;
+            ufo.v = 3;
+        };
+        down.release = function() {
+            ufo.v = 0;
         };
     }
     function gameLoop() {
@@ -200,14 +242,24 @@
         //Loop this function at 60 frames per second
         requestAnimationFrame(gameLoop);
 
-        ufo.x += ufo.vx;
-        stageCollison(ball, renderer);
-        ufoCollison(ball, ufo);
+        ufo.x += ufo.v * Math.cos(ufo.a);
+        ufo.y += ufo.v * Math.sin(ufo.a);
+        ufo.w -= ufo.w/100;
+        ufo.rotation += ufo.w;
+        for(var i = 0; i < balls.length; ++i){
+            for(var j = i + 1; j < balls.length; ++j){
+                ballCollison(balls[i], balls[j]);
+            }
+            stageCollison(balls[i], renderer);
+            ballCollison(balls[i], ufo);
+            balls[i].w -= balls[i].w/100;
+            balls[i].x += balls[i].v * Math.cos(balls[i].a);
+            balls[i].y += balls[i].v * Math.sin(balls[i].a);
+            balls[i].rotation += balls[i].w;
+        }
 
-        ball.w -= ball.w/100;
-        ball.x += ball.v * Math.cos(ball.a);
-        ball.y += ball.v * Math.sin(ball.a);
-        ball.rotation += ball.w;
+
+
 
 
 
